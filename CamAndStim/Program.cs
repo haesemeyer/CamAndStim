@@ -17,6 +17,7 @@ namespace CamAndStim
 
         static void Main(string[] args)
         {
+            Console.CancelKeyPress += Console_CancelKeyPress;
             Dictionary<int, Tuple<int, int>> Cameras;
             Cameras = new Dictionary<int, Tuple<int, int>>();
             Cameras[1] = new Tuple<int, int>(2048, 2048);
@@ -53,6 +54,11 @@ namespace CamAndStim
             }
             camsession.Shutdown();
             _imageWriter.Dispose();
+            StopLaserTasks();
+        }
+
+        private static void Console_CancelKeyPress(object sender, ConsoleCancelEventArgs e)
+        {
             StopLaserTasks();
         }
 
