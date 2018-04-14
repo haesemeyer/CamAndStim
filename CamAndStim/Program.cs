@@ -28,8 +28,8 @@ namespace CamAndStim
             CameraCollection cameras = null;
             camsession.Startup();
             cameras = camsession.Cameras;
-            Console.WriteLine(cameras[0]);
-            Console.WriteLine(cameras[1]);
+            Console.WriteLine("Camera 0 is : {0}", cameras[0]);
+            Console.WriteLine("Camera 1 is : {0}", cameras[1]);
             Console.WriteLine("Assuming that camera {0} is the main camera", cam_id);
             Console.WriteLine("Please enter the experiment name and press return:");
             string exp_name = Console.ReadLine();
@@ -51,20 +51,40 @@ namespace CamAndStim
         }
 
         /// <summary>
+        /// The number of seconds before and after each laser pulse
+        /// </summary>
+        static uint _laserPrePostSeconds = 10;
+
+        /// <summary>
+        /// The length of each laser pulse in seconds
+        /// </summary>
+        static uint _laserOnSeconds = 20;
+
+        /// <summary>
+        /// The desired laser current in mA during the pulse
+        /// </summary>
+        static double _laserCurrentmA = 2000;
+
+        /// <summary>
+        /// The number of laser stimulus presentations
+        /// </summary>
+        static uint _n_stim = 5;
+
+        /// <summary>
         /// The rate of analog out generation and ai readback
         /// for the laser
         /// </summary>
-        static int rate = 100;
+        static int _rate = 100;
 
         /// <summary>
         /// The smoothed version of the current laser readback
         /// </summary>
-        static double laser_aiv;
+        static double _laser_aiv;
 
         /// <summary>
         /// Lock object for laser aiv
         /// </summary>
-        static object laser_aiv_lock = new object();
+        static object _laser_aiv_lock = new object();
 
         /// <summary>
         /// Event to signal stop to our write task
@@ -76,22 +96,39 @@ namespace CamAndStim
         /// </summary>
         static AutoResetEvent _readStop = new AutoResetEvent(false);
 
+        /// <summary>
+        /// The task that writes analog out samples to control the laser
+        /// </summary>
         static System.Threading.Tasks.Task _laserWriteTask;
 
+        /// <summary>
+        /// The task that reads analog in samples to get the laser strength
+        /// </summary>
         static System.Threading.Tasks.Task _laserReadTask;
 
+        /// <summary>
+        /// Starts laser read and write tasks
+        /// </summary>
         static void StartLaserTasks()
         {
             _laserWriteTask = new System.Threading.Tasks.Task(() =>
             {
                 Task writeTask = new Task("LaserWrite");
-                double[] firstSamples = sampleFunction(0, rate);
+                double[] firstSamples = LaserFunction(0, _rate);
                 writeTask.AOChannels.CreateVoltageChannel("Dev2/AO2", "", 0, 10, AOVoltageUnits.Volts);
-                writeTask.Timing.ConfigureSampleClock("", rate, SampleClockActiveEdge.Rising, SampleQuantityMode.ContinuousSamples);
+                writeTask.Timing.ConfigureSampleClock("", _rate, SampleClockActiveEdge.Rising, SampleQuantityMode.ContinuousSamples);
                 writeTask.Stream.WriteRegenerationMode = WriteRegenerationMode.DoNotAllowRegeneration;
+                AnalogSingleChannelWriter dataWriter = new AnalogSingleChannelWriter(writeTask.Stream);
+                dataWriter.WriteMultiSample(false, firstSamples);
+                writeTask.Start();
+                long start_sample = _rate;
                 while (!_writeStop.WaitOne(100))
                 {
-
+                    double[] samples = LaserFunction(start_sample, _rate);
+                    if (samples == null)
+                        break;
+                    dataWriter.WriteMultiSample(false, samples);
+                    start_sample += _rate;
                 }
                 writeTask.Dispose();
             });
@@ -100,7 +137,7 @@ namespace CamAndStim
             {
                 Task read_task = new Task("laserRead");
                 read_task.AIChannels.CreateVoltageChannel("Dev2/ai16", "Laser", AITerminalConfiguration.Differential, -10, 10, AIVoltageUnits.Volts);
-                read_task.Timing.ConfigureSampleClock("", rate, SampleClockActiveEdge.Rising, SampleQuantityMode.ContinuousSamples);
+                read_task.Timing.ConfigureSampleClock("", _rate, SampleClockActiveEdge.Rising, SampleQuantityMode.ContinuousSamples);
                 read_task.Start();
                 AnalogSingleChannelReader laser_reader = new AnalogSingleChannelReader(read_task.Stream);
                 while (!_readStop.WaitOne(10))
@@ -109,11 +146,11 @@ namespace CamAndStim
                     if (nsamples >= 10)
                     {
                         double[] read = laser_reader.ReadMultiSample((int)nsamples);
-                        lock (laser_aiv_lock)
+                        lock (_laser_aiv_lock)
                         {
                             foreach (double d in read)
                                 //Simple exponential smoother
-                                laser_aiv = 0.9 * laser_aiv + 0.1 * d;
+                                _laser_aiv = 0.9 * _laser_aiv + 0.1 * d;
                         }
                     }
                 }
@@ -123,6 +160,49 @@ namespace CamAndStim
             _laserReadTask.Start();
         }
 
+        /// <summary>
+        /// Sample generation function for laser stimulus
+        /// </summary>
+        /// <param name="startSample">The index of the first sample to generate</param>
+        /// <param name="n_samples">The number of samples to generate</param>
+        /// <returns>The corresponding analog voltage samples</returns>
+        private static double[] LaserFunction(long startSample, int n_samples)
+        {
+            long peri_samples = _laserPrePostSeconds * _rate;
+            long stim_samples = _laserOnSeconds * _rate;
+            long cycle_length = 2 * peri_samples + stim_samples;
+            double[] samples = new double[n_samples];
+            for(int i = 0; i < n_samples; i++)
+            {
+                long currsample = startSample + i;
+                var cycle = currsample / cycle_length;
+                if (cycle >= _n_stim) //we are beyond the end of our protocol
+                    break;
+                if (currsample % cycle_length > peri_samples && currsample % cycle_length < stim_samples + peri_samples)
+                    samples[i] = LaserCurrentToAoV(_laserCurrentmA);
+            }
+            return samples;
+        }
+
+        /// <summary>
+        /// Convenience function to convert a desired laser diode current
+        /// to an analog out voltage
+        /// </summary>
+        /// <param name="laserCurrentmA">The desired current in mA</param>
+        /// <returns>The analog out control voltage</returns>
+        private static double LaserCurrentToAoV(double laserCurrentmA)
+        {
+            var ret = laserCurrentmA / 4000 * 10;
+            if (ret < 0)
+                ret = 0;
+            if (ret > 10)
+                ret = 10;
+            return ret;
+        }
+
+        /// <summary>
+        /// Stops the laser tasks and waites for them to finish
+        /// </summary>
         static void StopLaserTasks()
         {
             _writeStop.Set();
@@ -149,13 +229,17 @@ namespace CamAndStim
             return (byte)(fraction * 255);
         }
 
+        /// <summary>
+        /// Event handler for frames received from the camera
+        /// </summary>
+        /// <param name="frame">The received frame</param>
         private static void FrameReceived(Frame frame)
         {
             byte[,] image = new byte[frame.Height, frame.Width];
             byte laser_pixel = 0;
-            lock (laser_aiv_lock)
+            lock (_laser_aiv_lock)
             {
-                laser_pixel = EncodeLaserStrength(laser_aiv);
+                laser_pixel = EncodeLaserStrength(_laser_aiv);
             }
             for (int i = 0; i < frame.BufferSize; i++)
             {
