@@ -42,9 +42,15 @@ namespace CamAndStim
             string today_folder = string.Format("{0}_{1}_{2}", DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day);
             _imageWriter = new TiffWriter("F://PatchCommander_Data//"+today_folder+"//"+exp_name, true);
             av_cam.OnFrameReceived += FrameReceived;
-            av_cam.StartContinuousImageAcquisition(5000);//This is the maximum number of frames every aqcuired...
-            Console.WriteLine("Started continuous capture. Press enter to exit");
-            Console.ReadLine();
+            av_cam.StartContinuousImageAcquisition(5000);//This is the maximum number of frames ever aqcuired...
+            double total_seconds = _n_stim * (2 * _laserPrePostSeconds + _laserOnSeconds);
+            Console.WriteLine("Started continuous capture. Total length: {0} seconds", total_seconds);
+            while(total_seconds > 0)
+            {
+                Thread.Sleep(2000);
+                total_seconds -= 2;
+                Console.WriteLine("{0} seconds remaining.", total_seconds);
+            }
             camsession.Shutdown();
             _imageWriter.Dispose();
             StopLaserTasks();
@@ -131,6 +137,11 @@ namespace CamAndStim
                     start_sample += _rate;
                 }
                 writeTask.Dispose();
+                Task resetTask = new Task("LaserReset");
+                resetTask.AOChannels.CreateVoltageChannel("Dev2/AO2", "", 0, 10, AOVoltageUnits.Volts);
+                AnalogSingleChannelWriter resetWriter = new AnalogSingleChannelWriter(resetTask.Stream);
+                resetWriter.WriteSingleSample(true, 0);
+                resetTask.Dispose();
             });
 
             _laserReadTask = new System.Threading.Tasks.Task(() =>
