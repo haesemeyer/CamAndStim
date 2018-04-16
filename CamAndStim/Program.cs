@@ -13,54 +13,8 @@ namespace CamAndStim
 {
     class Program
     {
+        #region Members
         static TiffWriter _imageWriter;
-
-        static void Main(string[] args)
-        {
-            Console.CancelKeyPress += Console_CancelKeyPress;
-            Dictionary<int, Tuple<int, int>> Cameras;
-            Cameras = new Dictionary<int, Tuple<int, int>>();
-            Cameras[1] = new Tuple<int, int>(2048, 2048);
-            Cameras[0] = new Tuple<int, int>(492, 768);
-            int cam_id = 1;
-            int frameheight = Cameras[cam_id].Item1;
-            int framewidth = Cameras[cam_id].Item2;
-            Vimba camsession = new Vimba();
-            CameraCollection cameras = null;
-            camsession.Startup();
-            cameras = camsession.Cameras;
-            Console.WriteLine("Camera 0 is : {0}", cameras[0]);
-            Console.WriteLine("Camera 1 is : {0}", cameras[1]);
-            Console.WriteLine("Assuming that camera {0} is the main camera", cam_id);
-            Console.WriteLine("Please enter the experiment name and press return:");
-            string exp_name = Console.ReadLine();
-            Camera av_cam = cameras[cam_id];
-            Console.WriteLine("Starting laser tasks");
-            StartLaserTasks();
-            Console.WriteLine("Opening camera");
-            av_cam.Open(VmbAccessModeType.VmbAccessModeFull);
-            av_cam.LoadCameraSettings("CaSettings.xml");
-            string today_folder = string.Format("{0}_{1}_{2}", DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day);
-            _imageWriter = new TiffWriter("F://PatchCommander_Data//"+today_folder+"//"+exp_name, true);
-            av_cam.OnFrameReceived += FrameReceived;
-            av_cam.StartContinuousImageAcquisition(5000);//This is the maximum number of frames ever aqcuired...
-            double total_seconds = _n_stim * (2 * _laserPrePostSeconds + _laserOnSeconds);
-            Console.WriteLine("Started continuous capture. Total length: {0} seconds", total_seconds);
-            while(total_seconds > 0)
-            {
-                Thread.Sleep(2000);
-                total_seconds -= 2;
-                Console.WriteLine("{0} seconds remaining.", total_seconds);
-            }
-            camsession.Shutdown();
-            _imageWriter.Dispose();
-            StopLaserTasks();
-        }
-
-        private static void Console_CancelKeyPress(object sender, ConsoleCancelEventArgs e)
-        {
-            StopLaserTasks();
-        }
 
         /// <summary>
         /// The number of seconds before and after each laser pulse
@@ -117,6 +71,71 @@ namespace CamAndStim
         /// The task that reads analog in samples to get the laser strength
         /// </summary>
         static System.Threading.Tasks.Task _laserReadTask;
+
+        #endregion
+
+        static void Main(string[] args)
+        {
+            //Hook Ctrl+C and Ctrl+Break to be able to gracefully shut down laser
+            Console.CancelKeyPress += Console_CancelKeyPress;
+            //Obtain information on connected cameras
+            Vimba camsession = new Vimba();
+            CameraCollection cameras = null;
+            camsession.Startup();
+            cameras = camsession.Cameras;
+            //Write camera information to console
+            Console.WriteLine("Camera 0 is : {0}", cameras[0]);
+            Console.WriteLine("Camera 1 is : {0}", cameras[1]);
+            //Write default camera and paradigm structure to console
+            int cam_id_default = 1;
+            Console.WriteLine("############################################################");
+            Console.WriteLine("Paradigm defaults:");
+            Console.WriteLine("Assuming that camera {0} is the main camera", cam_id_default);
+            Console.WriteLine("Pre/post stimulus = {0} seconds.", _laserPrePostSeconds);
+            Console.WriteLine("Stimulus ON = {0} seconds.", _laserOnSeconds);
+            Console.WriteLine("Laser stimulus current = {0} mA.", _laserCurrentmA);
+            Console.WriteLine("############################################################");
+            Console.WriteLine("Please enter the experiment name and press return:");
+            string exp_name = Console.ReadLine();
+            Camera av_cam = cameras[cam_id_default];
+            Console.WriteLine("Starting laser tasks");
+            StartLaserTasks();
+            Console.WriteLine("Opening camera");
+            av_cam.Open(VmbAccessModeType.VmbAccessModeFull);
+            try
+            {
+                av_cam.LoadCameraSettings("CaSettings.xml");
+            }
+            catch
+            {
+                Console.WriteLine("Could not find camera configuration file CaSettings.xml");
+                Console.WriteLine("Reverting to whatever defaults are currently set...");
+            }
+            string today_folder = string.Format("{0}_{1}_{2}", DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day);
+            _imageWriter = new TiffWriter("F://PatchCommander_Data//"+today_folder+"//"+exp_name, true);
+            av_cam.OnFrameReceived += FrameReceived;
+            av_cam.StartContinuousImageAcquisition(5000);//This is the maximum number of frames ever aqcuired...
+            double total_seconds = _n_stim * (2 * _laserPrePostSeconds + _laserOnSeconds);
+            Console.WriteLine("Started continuous capture. Total length: {0} seconds", total_seconds);
+            while(total_seconds > 0)
+            {
+                Thread.Sleep(2000);
+                total_seconds -= 2;
+                Console.WriteLine("{0} seconds remaining.", total_seconds);
+            }
+            camsession.Shutdown();
+            _imageWriter.Dispose();
+            StopLaserTasks();
+            Console.WriteLine("Finished successfully.");
+            Thread.Sleep(1000);
+        }
+
+        private static void Console_CancelKeyPress(object sender, ConsoleCancelEventArgs e)
+        {
+            StopLaserTasks();
+        }
+
+        #region Methods
 
         /// <summary>
         /// Starts laser read and write tasks
@@ -271,5 +290,6 @@ namespace CamAndStim
             }
             _imageWriter.WriteFrame(image);
         }
+        #endregion
     }
 }
