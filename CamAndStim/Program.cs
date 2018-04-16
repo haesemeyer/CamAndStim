@@ -90,8 +90,8 @@ namespace CamAndStim
             camsession.Startup();
             cameras = camsession.Cameras;
             //Write camera information to console
-            Console.WriteLine("Camera 0 is : {0}", cameras[0]);
-            Console.WriteLine("Camera 1 is : {0}", cameras[1]);
+            for (int i = 0; i < cameras.Count; i++)
+                Console.WriteLine("Camera {0} is : {1}", i, cameras[i]);
             //Write default camera and paradigm structure to console
             Console.WriteLine("############################################################");
             Console.WriteLine("Paradigm defaults:");
@@ -101,6 +101,14 @@ namespace CamAndStim
             Console.WriteLine("Laser stimulus current = {0} mA.", _laserCurrentmA);
             Console.WriteLine("Number of stimulus trials = {0}.", _n_stim);
             Console.WriteLine("############################################################");
+            string answer = "";
+            while(answer != "a" && answer != "e")
+            {
+                Console.Write("accept defaults or edit? [a/e]");
+                answer = Console.ReadLine();
+            }
+            if (answer == "e")
+                AskParadigmInput();
             Console.WriteLine("Please enter the experiment name and press return:");
             string exp_name = Console.ReadLine();
             Camera av_cam = cameras[_cam_id_default];
@@ -143,6 +151,28 @@ namespace CamAndStim
         }
 
         #region Methods
+        
+        /// <summary>
+        /// Asks user to enter paradigm information
+        /// </summary>
+        static void AskParadigmInput()
+        {
+            Console.Write("Please enter the camera index to use:");
+            while (!int.TryParse(Console.ReadLine(), out _cam_id_default))
+                Console.WriteLine("Invalid input. Has to be integer.");
+            Console.Write("Please enter the number of seconds pre/post stimulus:");
+            while(!uint.TryParse(Console.ReadLine(), out _laserPrePostSeconds))
+                Console.WriteLine("Invalid input. Has to be positive integer.");
+            Console.Write("Please enter the number of stimulus seconds:");
+            while (!uint.TryParse(Console.ReadLine(), out _laserOnSeconds))
+                Console.WriteLine("Invalid input. Has to be positive integer.");
+            Console.Write("Please enter the laser current in mA:");
+            while (!double.TryParse(Console.ReadLine(), out _laserCurrentmA))
+                Console.WriteLine("Invalid input. Has to be numeric.");
+            Console.Write("Please enter the number of stimulus trials:");
+            while (!uint.TryParse(Console.ReadLine(), out _n_stim))
+                Console.WriteLine("Invalid input. Has to be positive integer.");
+        }
 
         /// <summary>
         /// Load user settings
