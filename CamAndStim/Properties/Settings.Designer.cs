@@ -22,5 +22,65 @@ namespace CamAndStim.Properties {
                 return defaultInstance;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("1")]
+        public int DefaultCam {
+            get {
+                return ((int)(this["DefaultCam"]));
+            }
+            set {
+                this["DefaultCam"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("10")]
+        public uint PrePostS {
+            get {
+                return ((uint)(this["PrePostS"]));
+            }
+            set {
+                this["PrePostS"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("20")]
+        public uint StimS {
+            get {
+                return ((uint)(this["StimS"]));
+            }
+            set {
+                this["StimS"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("2000")]
+        public double LCurrent {
+            get {
+                return ((double)(this["LCurrent"]));
+            }
+            set {
+                this["LCurrent"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("5")]
+        public uint NStim {
+            get {
+                return ((uint)(this["NStim"]));
+            }
+            set {
+                this["NStim"] = value;
+            }
+        }
     }
 }

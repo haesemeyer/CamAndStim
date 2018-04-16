@@ -19,22 +19,22 @@ namespace CamAndStim
         /// <summary>
         /// The number of seconds before and after each laser pulse
         /// </summary>
-        static uint _laserPrePostSeconds = 10;
+        static uint _laserPrePostSeconds;
 
         /// <summary>
         /// The length of each laser pulse in seconds
         /// </summary>
-        static uint _laserOnSeconds = 20;
+        static uint _laserOnSeconds;
 
         /// <summary>
         /// The desired laser current in mA during the pulse
         /// </summary>
-        static double _laserCurrentmA = 2000;
+        static double _laserCurrentmA;
 
         /// <summary>
         /// The number of laser stimulus presentations
         /// </summary>
-        static uint _n_stim = 5;
+        static uint _n_stim;
 
         /// <summary>
         /// The rate of analog out generation and ai readback
@@ -72,10 +72,16 @@ namespace CamAndStim
         /// </summary>
         static System.Threading.Tasks.Task _laserReadTask;
 
+        /// <summary>
+        /// The default camera id
+        /// </summary>
+        static int _cam_id_default;
+
         #endregion
 
         static void Main(string[] args)
         {
+            LoadUserSettings();
             //Hook Ctrl+C and Ctrl+Break to be able to gracefully shut down laser
             Console.CancelKeyPress += Console_CancelKeyPress;
             //Obtain information on connected cameras
@@ -87,17 +93,17 @@ namespace CamAndStim
             Console.WriteLine("Camera 0 is : {0}", cameras[0]);
             Console.WriteLine("Camera 1 is : {0}", cameras[1]);
             //Write default camera and paradigm structure to console
-            int cam_id_default = 1;
             Console.WriteLine("############################################################");
             Console.WriteLine("Paradigm defaults:");
-            Console.WriteLine("Assuming that camera {0} is the main camera", cam_id_default);
+            Console.WriteLine("Assuming that camera {0} is the main camera", _cam_id_default);
             Console.WriteLine("Pre/post stimulus = {0} seconds.", _laserPrePostSeconds);
             Console.WriteLine("Stimulus ON = {0} seconds.", _laserOnSeconds);
             Console.WriteLine("Laser stimulus current = {0} mA.", _laserCurrentmA);
+            Console.WriteLine("Number of stimulus trials = {0}.", _n_stim);
             Console.WriteLine("############################################################");
             Console.WriteLine("Please enter the experiment name and press return:");
             string exp_name = Console.ReadLine();
-            Camera av_cam = cameras[cam_id_default];
+            Camera av_cam = cameras[_cam_id_default];
             Console.WriteLine("Starting laser tasks");
             StartLaserTasks();
             Console.WriteLine("Opening camera");
@@ -126,6 +132,7 @@ namespace CamAndStim
             camsession.Shutdown();
             _imageWriter.Dispose();
             StopLaserTasks();
+            SaveUserSettings();
             Console.WriteLine("Finished successfully.");
             Thread.Sleep(1000);
         }
@@ -136,6 +143,28 @@ namespace CamAndStim
         }
 
         #region Methods
+
+        /// <summary>
+        /// Load user settings
+        /// </summary>
+        static void LoadUserSettings()
+        {
+            _cam_id_default = Properties.Settings.Default.DefaultCam;
+            _laserCurrentmA = Properties.Settings.Default.LCurrent;
+            _laserOnSeconds = Properties.Settings.Default.StimS;
+            _laserPrePostSeconds = Properties.Settings.Default.PrePostS;
+            _n_stim = Properties.Settings.Default.NStim;
+        }
+
+        static void SaveUserSettings()
+        {
+            Properties.Settings.Default.DefaultCam = _cam_id_default;
+            Properties.Settings.Default.LCurrent = _laserCurrentmA;
+            Properties.Settings.Default.StimS = _laserOnSeconds;
+            Properties.Settings.Default.PrePostS = _laserPrePostSeconds;
+            Properties.Settings.Default.NStim = _n_stim;
+            Properties.Settings.Default.Save();
+        }
 
         /// <summary>
         /// Starts laser read and write tasks
