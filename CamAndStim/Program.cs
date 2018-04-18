@@ -128,8 +128,9 @@ namespace CamAndStim
             string today_folder = string.Format("{0}_{1}_{2}", DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day);
             _imageWriter = new TiffWriter("F://PatchCommander_Data//"+today_folder+"//"+exp_name, true);
             av_cam.OnFrameReceived += FrameReceived;
-            av_cam.StartContinuousImageAcquisition(5000);//This is the maximum number of frames ever aqcuired...
             double total_seconds = _n_stim * (2 * _laserPrePostSeconds + _laserOnSeconds);
+            //Allocate enough frames for a 4Hz acquisition. TODO: Get/set true framerate based on exposure
+            av_cam.StartContinuousImageAcquisition((int)(total_seconds * 4));
             Console.WriteLine("Started continuous capture. Total length: {0} seconds", total_seconds);
             while(total_seconds > 0)
             {
