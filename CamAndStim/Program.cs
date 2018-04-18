@@ -77,6 +77,11 @@ namespace CamAndStim
         /// </summary>
         static int _cam_id_default;
 
+        /// <summary>
+        /// Image buffer
+        /// </summary>
+        static byte[,] _image;
+
         #endregion
 
         static void Main(string[] args)
@@ -331,7 +336,8 @@ namespace CamAndStim
         /// <param name="frame">The received frame</param>
         private static void FrameReceived(Frame frame)
         {
-            byte[,] image = new byte[frame.Height, frame.Width];
+            if (_image == null || _image.GetLength(0) != frame.Height || _image.GetLength(1) != frame.Width)
+                _image = new byte[frame.Height, frame.Width];
             byte laser_pixel = 0;
             lock (_laser_aiv_lock)
             {
@@ -344,11 +350,11 @@ namespace CamAndStim
                 c = i % frame.Width;
                 //Encode laser strength in the upper left corner
                 if (r < 50 && c < 50)
-                    image[r, c] = laser_pixel;
+                    _image[r, c] = laser_pixel;
                 else
-                    image[r, c] = frame.Buffer[i];
+                    _image[r, c] = frame.Buffer[i];
             }
-            _imageWriter.WriteFrame(image);
+            _imageWriter.WriteFrame(_image);
         }
         #endregion
     }
